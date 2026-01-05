@@ -67,12 +67,50 @@ export class AuthService {
       user,
       auth: {
         access_token: accessToken,
-        expires_in: 3600,
+        expires_in: process.env.JWT_ACCESS_EXPIRES_IN,
       },
       refresh_token: refreshToken, // usually set as HttpOnly cookie
     };
   }
-  async refreshToken(req: Request) {}
+  async refreshToken(refresh_token) {
+    const token = refresh_token
+    console.log("refresh_token", refresh_token)
+    
+    if(!token) {
+      console.warn('Refresh token missing')
+      throw new UnauthorizedException("Refresh token missing")
+    }
+    
+    const storedToken = await this.refreshTokenRepository.findValidToken(token)
+    console.log("refresh_token", refresh_token)
+
+    if(!storedToken) {
+      console.warn('Refresh token invalid or revoked')
+      throw new ForbiddenException('Invalid refresh token')
+    }
+
+    const user = await this.userRepository.findById(storedToken.user_id)
+    if(!user) {
+      console.error(`Refresh failed - user not found: ${storedToken.user_id}`)
+      throw new UnauthorizedException()
+    }
+
+    // ROTATE REFRESH TOKEN
+    await this.refreshTokenRepository.revokeToken(refresh_token)
+
+    const access_token = this.generateAccessToken(user)
+    const new_refresh_token = this.createRefreshToken(user)
+
+    console.info(`Access token refreshed: userId=${user.id}`)
+
+    return {
+      auth: {
+        access_token,
+        expires_in: process.env.JWT_ACCESS_EXPIRES_IN
+      },
+      refresh_token: new_refresh_token
+    }
+  }
   async logout(req: Request) {}
   async me(req: Request) {}
 
@@ -90,7 +128,7 @@ export class AuthService {
         email: user.email,
       },
       {
-        expiresIn: '1h',
+        expiresIn: '30s',
       },
     );
   }

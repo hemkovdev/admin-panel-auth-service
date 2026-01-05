@@ -45,6 +45,9 @@ export class RefreshTokenRepository {
       .exec();
 
     for (const token of tokens) {
+      console.log('rawToken:', rawToken);
+      console.log('token_hash:', token);
+
       const match = await bcrypt.compare(rawToken, token.token_hash);
       if (match) {
         return token;

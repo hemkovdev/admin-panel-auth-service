@@ -9,7 +9,7 @@ export class RefreshToken {
   /**
    * Hashed refresh token (never store raw token)
    */
-  @Prop({ required: true, select: false })
+  @Prop({ required: true })
   token_hash: string;
 
   /**
