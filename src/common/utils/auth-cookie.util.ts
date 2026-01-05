@@ -7,7 +7,8 @@ export const setRefreshTokenCookie = (
   res.cookie('refresh_token', refresh_token, {
     httpOnly: process.env.NODE_ENV === 'production' ? true: false,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    // sameSite: 'strict',
+    sameSite: 'none',
     path: '/api/v2/auth/refresh-token',
     maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
   });

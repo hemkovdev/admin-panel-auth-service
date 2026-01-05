@@ -27,8 +27,41 @@ export class AuthController {
 
   // LOGIN USER
   @Post('login')
-  @ApiOperation({ summary: 'Login user' })
-  @ApiResponse({ status: 200, description: 'Login successful' })
+  @ApiOperation({
+    summary: 'Login user',
+    description:
+      'Authenticates a user using email and password. Returns an access token in the response and sets the refresh token in an HttpOnly cookie.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Login successful',
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Email or password format is invalid. Please verify and try again.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Incorrect email or password. Please verify and try again.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: `You don't have permission to access this application.`,
+  })
+  @ApiResponse({
+    status: 408,
+    description: 'The server took too long to respond. Please try again.',
+  })
+  @ApiResponse({
+    status: 503,
+    description:
+      'The service is temporarily unavailable. Please try again later.',
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'An unexpected error occurred. Please try again.',
+  })
   async login(
     @Res({ passthrough: true }) res: Response,
     @Body() dto: LoginDto,
@@ -38,6 +71,13 @@ export class AuthController {
     setRefreshTokenCookie(res, result.refresh_token);
 
     return {
+      meta: {
+        request_id: 'req_' + Date.now(),
+        timestamp: new Date().toISOString(),
+        version: 'v2',
+        end_point: '/api/v2/auth/login',
+      },
+      user: result.user,
       auth: result.auth,
     };
   }
@@ -63,17 +103,18 @@ export class AuthController {
 
   // LOGOUT
   @Post('logout')
+  @ApiCookieAuth('refresh_token')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Logout user' })
-  logout(@Req() req: Request) {
-    this.authService.logout(req);
+  logout(@CookieRefreshToken() refresh_token: string) {
+    this.authService.logout(refresh_token);
   }
 
   // ME
-  @Get('me')
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get current user' })
-  me(@Req() req: Request) {
-    return this.authService.me(req);
-  }
+  // @Get('me')
+  // @ApiBearerAuth()
+  // @ApiOperation({ summary: 'Get current user' })
+  // me(@Req() req: Request) {
+  //   return this.authService.me(req);
+  // }
 }

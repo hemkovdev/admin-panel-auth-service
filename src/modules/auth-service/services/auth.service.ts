@@ -1,6 +1,9 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
+  RequestTimeoutException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { LoginDto, SignUpDto } from '../dtos';
@@ -21,10 +24,11 @@ export class AuthService {
   ) {}
 
   async signup(dto: SignUpDto) {
-    // console.info(`Signup started: email=${dto.email}`);
+    console.info(`Signup started: email=${dto.email}`);
     const existingUser = await this.userRepository.findByEmail(dto?.email);
+
     if (existingUser) {
-      //   console.warn(`Signup failed — email already exists: ${dto.email}`);
+        console.warn(`Signup failed — email already exists: ${dto.email}`);
       throw new ForbiddenException('Email already registered');
     }
 
@@ -40,79 +44,127 @@ export class AuthService {
     });
 
     console.info(`Signup successful: userId=${user.id}`);
+    
     return {
       user,
     };
   }
   async login(dto: LoginDto) {
     console.info(`Login attempt: email=${dto.email}`);
-    const user = await this.userRepository.findByEmailWithPassword(dto.email);
-    if (!user) {
-      console.warn(`Login failed — user not found: ${dto.email}`);
-      throw new UnauthorizedException('Invalid credentials');
+
+    try {
+      const user = await this.userRepository.findByEmailWithPassword(dto.email);
+
+      if (!user) {
+        console.warn(`Login failed — user not found: ${dto.email}`);
+        throw new UnauthorizedException(
+          'Incorrect email or password. Please verify and try again.',
+        );
+      }
+
+      if (user.status !== 'active') {
+        console.warn(`Login blocked — user inactive: userId=${user.id}`);
+        throw new ForbiddenException(
+          'You don’t have permission to access this application.',
+        );
+      }
+
+      const isPasswordValid = await bcrypt.compare(dto.password, user.password);
+
+      if (!isPasswordValid) {
+        console.warn(`Login failed — invalid password: userId=${user.id}`);
+        throw new UnauthorizedException(
+          'Incorrect email or password. Please verify and try again.',
+        );
+      }
+
+      const accessToken = this.generateAccessToken(user);
+      const refreshToken = await this.createRefreshToken(user);
+
+      await this.userRepository.updateLastLogin(user.id);
+
+      console.info(`Login successful: userId=${user.id}`);
+
+      return {
+        user,
+        auth: {
+          access_token: accessToken,
+          expires_in: process.env.JWT_ACCESS_EXPIRES_IN,
+        },
+        refresh_token: refreshToken,
+      };
+    } catch (error) {
+      if (
+        error instanceof UnauthorizedException ||
+        error instanceof ForbiddenException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+
+      if (error.name === 'MongoNetworkTimeoutError') {
+        console.error('Login timeout', error);
+        throw new RequestTimeoutException(
+          'The server took too long to respond. Please try again.',
+        );
+      }
+
+      console.error('Login failed — internal error', error);
+      throw new InternalServerErrorException(
+        'An unexpected error occurred. Please try again.',
+      );
     }
-
-    if (user.status !== 'active') {
-      console.warn(`Login blocked — user inactive: userId=${user.id}`);
-      throw new ForbiddenException('User account is not active');
-    }
-
-    const accessToken = this.generateAccessToken(user);
-    const refreshToken = await this.createRefreshToken(user);
-
-    await this.userRepository.updateLastLogin(user.id);
-    console.info(`Login successful: userId=${user.id}`);
-
-    return {
-      user,
-      auth: {
-        access_token: accessToken,
-        expires_in: process.env.JWT_ACCESS_EXPIRES_IN,
-      },
-      refresh_token: refreshToken, // usually set as HttpOnly cookie
-    };
   }
+
   async refreshToken(refresh_token) {
-    const token = refresh_token
-    console.log("refresh_token", refresh_token)
-    
-    if(!token) {
-      console.warn('Refresh token missing')
-      throw new UnauthorizedException("Refresh token missing")
-    }
-    
-    const storedToken = await this.refreshTokenRepository.findValidToken(token)
-    console.log("refresh_token", refresh_token)
+    const token = refresh_token;
+    console.log('refresh_token', refresh_token);
 
-    if(!storedToken) {
-      console.warn('Refresh token invalid or revoked')
-      throw new ForbiddenException('Invalid refresh token')
+    if (!token) {
+      console.warn('Refresh token missing');
+      throw new UnauthorizedException('Refresh token missing');
     }
 
-    const user = await this.userRepository.findById(storedToken.user_id)
-    if(!user) {
-      console.error(`Refresh failed - user not found: ${storedToken.user_id}`)
-      throw new UnauthorizedException()
+    const storedToken = await this.refreshTokenRepository.findValidToken(token);
+    console.log('refresh_token', refresh_token);
+
+    if (!storedToken) {
+      console.warn('Refresh token invalid or revoked');
+      throw new ForbiddenException('Invalid refresh token');
+    }
+
+    const user = await this.userRepository.findById(storedToken.user_id);
+    if (!user) {
+      console.error(`Refresh failed - user not found: ${storedToken.user_id}`);
+      throw new UnauthorizedException();
     }
 
     // ROTATE REFRESH TOKEN
-    await this.refreshTokenRepository.revokeToken(refresh_token)
+    await this.refreshTokenRepository.revokeToken(refresh_token);
 
-    const access_token = this.generateAccessToken(user)
-    const new_refresh_token = this.createRefreshToken(user)
+    const access_token = this.generateAccessToken(user);
+    const new_refresh_token = this.createRefreshToken(user);
 
-    console.info(`Access token refreshed: userId=${user.id}`)
+    console.info(`Access token refreshed: userId=${user.id}`);
 
     return {
       auth: {
         access_token,
-        expires_in: process.env.JWT_ACCESS_EXPIRES_IN
+        expires_in: process.env.JWT_ACCESS_EXPIRES_IN,
       },
-      refresh_token: new_refresh_token
-    }
+      refresh_token: new_refresh_token,
+    };
   }
-  async logout(req: Request) {}
-  async me(req: Request) {}
+  async logout(refresh_token) {
+    if (refresh_token) {
+      await this.refreshTokenRepository.revokeToken(refresh_token);
+      console.info('Refresh token revoked on logout');
+    }
+    return {
+      message: 'Logged out successfully',
+    };
+  }
+  // async me(req: Request) {}
 
   /**
    * ======================
