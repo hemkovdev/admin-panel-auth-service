@@ -74,7 +74,7 @@ export class AuthController {
       meta: {
         request_id: 'req_' + Date.now(),
         timestamp: new Date().toISOString(),
-        version: 'v2',
+        version: process?.env.VERSION || "v1",
         end_point: '/api/v2/auth/login',
       },
       user: result.user,
@@ -92,6 +92,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
     @CookieRefreshToken() refresh_token: string,
   ) {
+    console.log("refresh_token", refresh_token)
     const result = await this.authService.refreshToken(refresh_token);
 
     setRefreshTokenCookie(res, refresh_token);
@@ -107,7 +108,7 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Logout user' })
   logout(@CookieRefreshToken() refresh_token: string) {
-    this.authService.logout(refresh_token);
+    return this.authService.logout(refresh_token);
   }
 
   // ME

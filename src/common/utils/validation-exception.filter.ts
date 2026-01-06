@@ -24,7 +24,7 @@ export class ValidationExceptionFilter implements ExceptionFilter {
       meta: {
         request_id: 'req_' + Date.now(),
         timestamp: new Date().toISOString(),
-        version: 'v2',
+        version: process?.env?.VERSION || 'v1',
       },
       error: {
         code: 'INVALID_REQUEST',
