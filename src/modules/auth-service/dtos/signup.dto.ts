@@ -3,7 +3,6 @@ import {
   IsEmail,
   IsIn,
   IsNotEmpty,
-  IsOptional,
   IsString,
   Matches,
   MinLength,
@@ -13,6 +12,7 @@ export class SignUpDto {
   @ApiProperty({
     example: 'Rahul Sharma',
     description: 'Full name of the user',
+    required: true
   })
   @IsString()
   @IsNotEmpty()
@@ -21,6 +21,7 @@ export class SignUpDto {
   @ApiProperty({
     example: 'user@thirdwavecoffee.in',
     description: 'Registeered email address',
+    required: true
   })
   @IsEmail()
   email: string;
@@ -29,6 +30,7 @@ export class SignUpDto {
     example: 'Password@123',
     description:
       'Password must contain at least 8 characters, one uppercase letter, one lowercase letter, one number, and one special character',
+      required: true
   })
   @IsString()
   @MinLength(8)
@@ -42,9 +44,9 @@ export class SignUpDto {
     example: 'USER',
     description: 'Role assigned to user',
     enum: ['USER', 'ADMIN'],
-    required: false,
+    required: true,
+    default: "USER"
   })
-  @IsOptional()
   @IsIn(['USER', 'ADMIN'])
   role: string;
 }

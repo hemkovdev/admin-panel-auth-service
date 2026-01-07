@@ -13,8 +13,8 @@ export enum UserStatus {
 
 @Schema({ timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } })
 export class User {
-  @Prop({ required: true, unique: true })
-  id: string;
+  @Prop({ required: true, unique: true, index: true })
+  user_id: string;
 
   @Prop({ required: true })
   full_name: string;
@@ -44,18 +44,18 @@ export class User {
   })
   status: UserStatus;
 
-  /**
-   * Auth / Security
-   */
+  @Prop({ type: Boolean, default: false })
+  is_email_verified: boolean;
+
+  @Prop({ default: 0 })
+  failed_login_attempts: number;
+
   @Prop({ default: null })
   last_login_at?: Date;
 
   @Prop({ default: null })
   password_changed_at?: Date;
 
-  /**
-   * Soft delete / blocking
-   */
   @Prop({ default: null })
   blocked_at?: Date;
 }

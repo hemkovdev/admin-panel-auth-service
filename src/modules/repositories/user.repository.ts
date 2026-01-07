@@ -38,7 +38,7 @@ export class UserRepository {
    * Find user by ID
    */
   async findById(userId: string): Promise<UserDocument | null> {
-    return this.userModel.findOne({ id: userId }).exec();
+    return this.userModel.findOne({ user_id: userId }).exec();
   }
 
   /**

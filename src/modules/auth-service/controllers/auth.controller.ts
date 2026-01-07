@@ -75,7 +75,7 @@ export class AuthController {
         request_id: 'req_' + Date.now(),
         timestamp: new Date().toISOString(),
         version: process?.env.VERSION || "v1",
-        end_point: '/api/v2/auth/login',
+        end_point: '/api/v1/auth/login',
       },
       user: result.user,
       auth: result.auth,

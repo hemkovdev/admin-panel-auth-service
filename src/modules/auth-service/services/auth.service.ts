@@ -23,19 +23,20 @@ export class AuthService {
     private readonly refreshTokenRepository: RefreshTokenRepository,
   ) {}
 
+  // SIGNUP
   async signup(dto: SignUpDto) {
     console.info(`Signup started: email=${dto.email}`);
     const existingUser = await this.userRepository.findByEmail(dto?.email);
 
     if (existingUser) {
-        console.warn(`Signup failed — email already exists: ${dto.email}`);
+      console.warn(`Signup failed — email already exists: ${dto.email}`);
       throw new ForbiddenException('Email already registered');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
     const user = await this.userRepository.createUser({
-      id: uuidv4(),
+      user_id: uuidv4(),
       full_name: dto.full_name,
       email: dto.email,
       password: passwordHash,
@@ -44,11 +45,13 @@ export class AuthService {
     });
 
     console.info(`Signup successful: userId=${user.id}`);
-    
+
     return {
       user,
     };
   }
+
+  // LOGIN
   async login(dto: LoginDto) {
     console.info(`Login attempt: email=${dto.email}`);
 
@@ -116,6 +119,7 @@ export class AuthService {
     }
   }
 
+  // REFRESH TOKEN
   async refreshToken(refresh_token) {
     const token = refresh_token;
     console.log('refresh_token', refresh_token);
@@ -155,6 +159,8 @@ export class AuthService {
       refresh_token: new_refresh_token,
     };
   }
+
+  // LOGOUT
   async logout(refresh_token) {
     if (refresh_token) {
       await this.refreshTokenRepository.revokeToken(refresh_token);
@@ -173,16 +179,22 @@ export class AuthService {
    */
 
   private generateAccessToken(user: UserDocument): string {
-    return this.jwtService.sign(
-      {
-        user_id: user.id,
-        role: user.role,
-        email: user.email,
-      },
-      {
-        expiresIn: '30s',
-      },
-    );
+    if (!user?.user_id) throw new Error('User ID is missing');
+
+    const expiresIn: string = process.env.JWT_ACCESS_EXPIRES_IN ?? '15m';
+
+    const payload = {
+      sub: user.user_id,
+      role: user.role,
+    };
+
+    return this.jwtService.sign(payload, {
+      algorithm: 'HS256',
+      expiresIn: '15m',
+      issuer: 'auth-service',
+      audience: 'web-client',
+      secret: process.env.JWT_ACCESS_SECRET
+    });
   }
 
   private async createRefreshToken(user: UserDocument): Promise<string> {
@@ -190,7 +202,7 @@ export class AuthService {
     const tokenHash = await bcrypt.hash(rawToken, 10);
 
     await this.refreshTokenRepository.create({
-      user_id: user.id,
+      user_id: user.user_id,
       token_hash: tokenHash,
       expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),
     }); // 7 days
