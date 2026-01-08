@@ -147,7 +147,7 @@ export class AuthService {
     await this.refreshTokenRepository.revokeToken(refresh_token);
 
     const access_token = this.generateAccessToken(user);
-    const new_refresh_token = this.createRefreshToken(user);
+    const new_refresh_token = await this.createRefreshToken(user);
 
     console.info(`Access token refreshed: userId=${user.id}`);
 
@@ -181,20 +181,12 @@ export class AuthService {
   private generateAccessToken(user: UserDocument): string {
     if (!user?.user_id) throw new Error('User ID is missing');
 
-    const expiresIn: string = process.env.JWT_ACCESS_EXPIRES_IN ?? '15m';
-
     const payload = {
       sub: user.user_id,
       role: user.role,
     };
 
-    return this.jwtService.sign(payload, {
-      algorithm: 'HS256',
-      expiresIn: '15m',
-      issuer: 'auth-service',
-      audience: 'web-client',
-      secret: process.env.JWT_ACCESS_SECRET
-    });
+    return this.jwtService.sign(payload);
   }
 
   private async createRefreshToken(user: UserDocument): Promise<string> {

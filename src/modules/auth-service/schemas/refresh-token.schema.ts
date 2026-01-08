@@ -55,7 +55,7 @@ RefreshTokenSchema.set('toObject', {
  */
 RefreshTokenSchema.index({ user_id: 1 });
 RefreshTokenSchema.index({ revoked_at: 1 });
-RefreshTokenSchema.index({ expires_at: 1 });
+// RefreshTokenSchema.index({ expires_at: 1 });
 
 /**
  * TTL index
